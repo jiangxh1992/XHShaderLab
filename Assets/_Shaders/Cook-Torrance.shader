@@ -21,61 +21,17 @@ Shader "XHShaderLab/Cook-Toorance"
 		_Shininess("Shininess", Range(0,100)) = 50   // phong模型中镜面反射的高光系数
 		[Enum(None,0,CookTorrance,1,Phong,2,BlinnPhong,3,BankBRDF,4)]_LightModel("LightModel",Int) = 1
 
-		/* 简单透明混合 */
-		_AlphaScale("AlphaScale",Range(0,1)) = 1.0 // 透明度
-
-		/* 环境光贴图 */
-		_ReflectColor("ReflectColor",Color) = (1,1,1,1) // 反射颜色
-		_ReflectScale("ReflectScale",Range(0,1)) = 0.5 // 反射系数
-		_Cubemap("CubeMap",Cube) = "_Skybox"{}
-
 		/* 次表面散射 */
-		_DepthTexture("SSSDepthTexture",2D) = "white"{}
 		_Distortion("SSSDistortion",Range(0,2)) = 1
 		_Scale("SSSScale",Range(0,10)) = 1
 		_Power("SSSPower",Range(0,10)) = 1
     }
     SubShader
     {
-        Tags {"Queue"="Transparent" "RenderType"="Transparent" "LightMode"="ForwardBase"}
+        Tags { "RenderType"="Opaque"}
         //LOD 100
 		//ZWrite Off
 		Blend SrcAlpha OneMinusSrcAlpha
-		// depth pass
-		/*
-		Pass
-		{
-		    ZTest Greater
-			CGPROGRAM
-			#pragma vertex vert
-			#pragma fragment frag
-
-			struct appdata
-            {
-                float4 vertex : POSITION;
-            };
-			struct v2f
-            {
-                float depth : TEXCOORD0;
-            };
-
-			v2f vert (appdata v)
-            {
-			    v2f o;
-				float3 vpos = mul(UNITY_MATRIX_MV, v.vertex);
-				o.depth = length(vpos);
-
-				return o;
-			}
-
-			fixed4 frag (v2f i) : SV_Target
-            {
-			    return i.dist;
-			}
-
-			ENDCG
-		}
-		*/
         Pass
         {
 			Cull Back
@@ -100,6 +56,7 @@ Shader "XHShaderLab/Cook-Toorance"
 				float4 eyePosition : TEXCOORD2;
 				float4 N : TEXCOORD3;
 				float4 position : TEXCOORD4;
+				float4 worldPos : TEXCOORD5;
             };
 
             sampler2D _MainTex;
@@ -114,17 +71,15 @@ Shader "XHShaderLab/Cook-Toorance"
 			float _Roughness;
 			float _Fresnel;
 			float _Shininess;
-			float _AlphaScale;
 
 			float _LightModel;
-			samplerCUBE _Cubemap;
-			float4 _ReflectColor;
-			float _ReflectScale;
 
 			float _Distortion;
 			float _Scale;
 			float _Power;
-			sampler2D _DepthTexture;
+
+			sampler2D _LightDepthTex;   // 光源深度图
+            float4x4 _LightProjection;  // 光源变换矩阵
 
             v2f vert (appdata v)
             {
@@ -132,6 +87,8 @@ Shader "XHShaderLab/Cook-Toorance"
 				o.vertex = UnityObjectToClipPos(v.vertex);
 				// 顶点世界坐标
                 o.position = mul(v.vertex.xyz, (float3x3)unity_ObjectToWorld).xyzz;
+				o.worldPos = mul(UNITY_MATRIX_M, v.vertex);
+				o.worldPos.w = 1;
 				// uv坐标
                 o.uv = ComputeScreenPos(v.vertex);//TRANSFORM_TEX(v.uv, _MainTex);
 				// 世界坐标法线
@@ -147,7 +104,25 @@ Shader "XHShaderLab/Cook-Toorance"
 
             fixed4 frag (v2f i) : SV_Target
             {
-			//return float4(0,0,0,0);
+			    float3 L;
+				if(i.lightPos.w == 0)
+				    L = normalize(i.lightPos.xyz); // 平行光
+				else
+				    L = normalize(i.lightPos.xyz - i.position.xyz);
+				float3 N = i.N.xyz;
+				float nl = max(dot(N,L),0);
+			    float3 V = normalize(i.eyePosition.xyz - i.position.xyz);
+				float3 H = normalize(L + V); // 半角向量
+				float3 R = normalize(2 * nl * N - L); // 反射光向量
+
+				
+				float3 T = normalize(cross(N,V)); // 顶点切线向量
+				float nh = max(dot(N,H),0);
+				float nv = max(dot(N,V),0);
+				float vh = max(dot(V,H),0);
+				bool front = nl > 0;//(nv > 0) && (nl > 0); // 光源模型正面
+
+
 			    float4 Color;
 
 			    // 贴图颜色
@@ -158,27 +133,16 @@ Shader "XHShaderLab/Cook-Toorance"
 				float3 ambient = _Ka * _GlobalAmbient.rgb;
 
 				// 漫反射光
-				float3 L = normalize(i.lightPos.xyz - i.position.xyz);
-				float3 N = i.N.xyz;
-				float nl = max(dot(N,L),0);
 				float wrap_nl = (nl + _Wrap) / (1 + _Wrap);
 				float3 diffuse = _Kd * _LightColor.rgb * wrap_nl;
 				
 				// 1. Cook-Torrance镜面反射
 				float3 specular = 0;
-				float3 V = normalize(i.eyePosition.xyz - i.position.xyz);
-				float3 H = normalize(L + V); // 半角向量
-				float3 R = normalize(2 * nl * N - L); // 反射光向量
-
-				float nv = dot(N,V);
-				bool back = (nv > 0) && (nl > 0);
-				if(back)
+				if(front)
 				{
-				    float nh = dot(N,H);
 					float temp = (nh*nh-1) / (_Roughness*_Roughness * nh*nh);
 					float roughness = (exp(temp)) / (pow(_Roughness,2)*pow(nh,4.0)); // 粗糙度，根据beckmann函数
-
-					float vh = dot(V,H);
+					
 					float a = (2*nh*nv)/vh;
 					float b = (2*nh*nl)/vh;
 					float geometric = min(a,b);
@@ -193,31 +157,34 @@ Shader "XHShaderLab/Cook-Toorance"
 				float vr = max(dot(V,R),0);
 				float specular_phong = _Ks * _LightColor * pow(vr,_Shininess);
 
-
 				// 3. blinn-phong模型镜面反射
-				float nh = max(dot(N,H),0);
 				float specular_blinnPhong = _Ks * _LightColor * pow(nh,_Shininess);
 
 				// 4. Bank BRDF经验模型镜面反射
 				float3 specular_bankBRDF = 0;
-				if(back)
+				if(front)
 				{
-				    float3 T = normalize(cross(N,V)); // 顶点切线向量
 					float a = dot(L,T);
 					float b = dot(V,T);
 					float c = sqrt(1-pow(a,2.0)) * sqrt(1-pow(b,2.0)) - a*b; // Bank BRDF系数
 					float brdf = _Ks * pow(c, _Shininess);
 					specular_bankBRDF = brdf * _LightColor * nl;
 				}
-
-				// 反射颜色(环境光贴图）
-				// reflection = texCUBE(_Cubemap,R).rgb * _ReflectColor.rgb;
-				//bedo.xyz = lerp(albedo.xyz,reflection,_ReflectScale);
 				
-				// 此表面散射
-				float3 H2 = normalize(L + N * _Distortion);
-                float I = pow(saturate(dot(V, H2)), _Power) * _Scale;
-				float depthColor = tex2D(_DepthTexture,i.uv);
+				// 次表面散射
+				float I = 1.0;
+				float3 H2 = normalize(L - N * _Distortion);
+
+				if(front)
+				{
+				    I = pow(saturate(dot(V, -H2)), _Power) * _Scale;
+				}
+				else
+				{
+				    float H2Back = dot(V,-(L + N));
+				    float wrap_lv = (H2Back + _Wrap) / (1 + _Wrap);
+				    I = pow(saturate(H2Back), _Power) * _Scale;
+				}
 
 				// 分量合成
 				if(_LightModel == 1)
@@ -231,11 +198,12 @@ Shader "XHShaderLab/Cook-Toorance"
 				else
 				    Color.rgb = albedo * (diffuse + ambient*I);
 
-				Color.a = _AlphaScale;
+				Color.a = 1.0;
 
 				return Color; //float4(I,I,I,1)
             }
             ENDCG
         }
+		
     }
 }

@@ -1,4 +1,4 @@
-﻿// 环境光贴图
+﻿// 环境光贴图 + 简单透明度混合
 Shader "XHShaderLab/EnvironmentMap"
 {
     Properties
@@ -7,7 +7,6 @@ Shader "XHShaderLab/EnvironmentMap"
 
 		_LightColor ("LightColor", Color) = (1,1,1,1) // 太阳光颜色
 		_Kd ("Kd", Range(0,1)) = 1.0  // 漫反射系数
-		_Ks("Ks",Range(0,1)) = 1.0    // 镜面反射系数
 
 		_GlobalAmbient("GlobalAmbient", Color) = (1,1,1,1) // 环境光颜色
 		_Ka("Ka", Range(0,1)) = 1.0   // 环境光系数
@@ -87,7 +86,6 @@ Shader "XHShaderLab/EnvironmentMap"
 
 			    // 贴图颜色
                 float4 albedo = tex2D(_MainTex, i.uv);
-				//clip(albedo.w - 0.5f);
 				
 				// 环境光
 				float3 ambient = _Ka * _GlobalAmbient.rgb;
