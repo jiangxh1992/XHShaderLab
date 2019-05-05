@@ -68,15 +68,15 @@ Material:
     - _BumpScale: 1
     - _Cutoff: 0.5
     - _DetailNormalMapScale: 1
-    - _Distortion: 1.28
+    - _Distortion: 1.6
     - _DstBlend: 0
     - _Fresnel: 1
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
-    - _Ka: 0.634
+    - _Ka: 0.396
     - _Kd: 1
-    - _Ks: 0.621
+    - _Ks: 1
     - _LightModel: 4
     - _Metallic: 0
     - _Mode: 0
@@ -84,20 +84,20 @@ Material:
     - _Parallax: 0.02
     - _Power: 10
     - _ReflectScale: 0
-    - _Roughness: 0.071
-    - _Scale: 2.48
+    - _Roughness: 0
+    - _Scale: 1.48
     - _Shininess: 100
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _Thickness: 1
     - _UVSec: 0
-    - _Wrap: 0.2
+    - _Wrap: 0.239
     - _ZWrite: 1
     m_Colors:
     - _AttenuationC: {r: 0.6037736, g: 0.36169454, b: 0.36169454, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _GlobalAmbient: {r: 1, g: 1, b: 1, a: 1}
-    - _LightColor: {r: 0.9811321, g: 0.89843297, b: 0.18974723, a: 1}
+    - _LightColor: {r: 0.3149441, g: 0.98039216, b: 0.18823527, a: 1}
     - _ReflectColor: {r: 1, g: 1, b: 1, a: 1}

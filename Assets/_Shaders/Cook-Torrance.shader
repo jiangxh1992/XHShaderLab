@@ -81,6 +81,8 @@ Shader "XHShaderLab/Cook-Toorance"
 			sampler2D _LightDepthTex;   // 光源深度图
             float4x4 _LightProjection;  // 光源变换矩阵
 
+#define PI 3.1415926
+
             v2f vert (appdata v)
             {
                 v2f o;
@@ -101,6 +103,20 @@ Shader "XHShaderLab/Cook-Toorance"
 				
                 return o;
             }
+
+			// GGX法线分布函数
+			float DistributionGGX(float3 N, float3 H, float a)
+			{
+				float a2 = a * a;
+				float NdotH = max(dot(N, H), 0.0);
+				float NdotH2 = NdotH * NdotH;
+
+				float nom = a2;
+				float denom = (NdotH2 * (a2 - 1.0) + 1.0);
+				denom = PI * denom * denom;
+
+				return nom / denom;
+			}
 
             fixed4 frag (v2f i) : SV_Target
             {
@@ -141,15 +157,17 @@ Shader "XHShaderLab/Cook-Toorance"
 				if(front)
 				{
 					float temp = (nh*nh-1) / (_Roughness*_Roughness * nh*nh);
-					float roughness = (exp(temp)) / (pow(_Roughness,2)*pow(nh,4.0)); // 粗糙度，根据beckmann函数
-					
+					float D = (exp(temp)) / (pow(_Roughness,2)*pow(nh,4.0)); // 1.1 beckmann函数，法线分布函数，估算在受到表面粗糙度的影响下，取向方向与中间向量一致的微平面的数量（半角向量H）
+					float DGGX = DistributionGGX(N, H, _Roughness);
+
 					float a = (2*nh*nv)/vh;
 					float b = (2*nh*nl)/vh;
-					float geometric = min(a,b);
-					geometric = min(1,geometric); // 几何衰减系数
+					float G = min(a,b);
+					G = min(1,G); // 1.2 几何衰减系数，衡量微表面自身屏蔽光强的影响
 
-					float fresnelCoe = _Fresnel + (1-_Fresnel)*pow(1-vh,5.0); // fresnel 反射系数
-					float rs = (fresnelCoe*geometric*roughness) / (nv * nl);
+					float F = _Fresnel + (1-_Fresnel)*pow(1-vh,5.0); // 1.3 fresnel反射系数,描述反射光强比率
+
+					float rs = (F * G * D) / (nv * nl);
 					specular = _Ks * rs * _LightColor.rgb * nl;
 				}
 

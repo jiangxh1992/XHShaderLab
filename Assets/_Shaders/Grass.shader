@@ -156,13 +156,13 @@ Shader "XHShaderLab/Grass"
 
 				// 4. Bank BRDF经验模型镜面反射
 				float3 specular_bankBRDF = 0;
+				float3 T = normalize(cross(N, V)); // 顶点切线向量
+				float a = dot(L, T);
+				float b = dot(V, T);
+				float c = sqrt(1 - pow(a, 2.0)) * sqrt(1 - pow(b, 2.0)) - a * b; // Bank BRDF系数
+				float brdf = _Ks * pow(c, _Shininess);
 				if(back)
 				{
-				    float3 T = normalize(cross(N,V)); // 顶点切线向量
-					float a = dot(L,T);
-					float b = dot(V,T);
-					float c = sqrt(1-pow(a,2.0)) * sqrt(1-pow(b,2.0)) - a*b; // Bank BRDF系数
-					float brdf = _Ks * pow(c, _Shininess);
 					specular_bankBRDF = brdf * _LightColor * nl;
 				}
 				
@@ -178,7 +178,7 @@ Shader "XHShaderLab/Grass"
 			    else if(_LightModel == 3)
 				    Color.rgb = albedo * (diffuse + ambient*I + specular_blinnPhong);
 				else if(_LightModel == 4)
-					Color.rgb = albedo * (diffuse + ambient*I + specular_bankBRDF);
+					Color.rgb = albedo * (diffuse + ambient* brdf + specular_bankBRDF);
 				else
 				    Color.rgb = albedo * (diffuse + ambient*I);
 
